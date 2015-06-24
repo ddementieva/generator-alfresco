@@ -25,39 +25,37 @@ module.exports = yeoman.generators.Base.extend({
         promptForProjectPackage: true,
         supportedJavaVersions: '^1.8.0',
         supportedMavenVersions: '^3.2.5',
-        removeSamplesScript: [
-          {
-            cmd: 'removeFolders', 
-            paths:  [
-              'repo-amp/src/main/java/${projectPackagePath}/demoamp',
-              'repo-amp/src/test/java/${projectPackagePath}/demoamp'
-          	]
-          },
-          {
-            cmd: 'removeFiles', 
-            paths: [
-              'repo-amp/src/main/amp/web/css/demoamp.css',
-              'repo-amp/src/main/amp/web/jsp/demoamp.jsp',
-              'repo-amp/src/main/amp/web/scripts/demoamp.js',
-              'repo-amp/src/main/amp/config/alfresco/extension/templates/webscripts/helloworld.get.desc.xml',
-              'repo-amp/src/main/amp/config/alfresco/extension/templates/webscripts/helloworld.get.html.ftl',
-              'repo-amp/src/main/amp/config/alfresco/extension/templates/webscripts/helloworld.get.js',
-              'repo-amp/src/main/amp/config/alfresco/module/repo-amp/webscripts/helloworld.get.js',
-              'repo-amp/src/main/amp/config/alfresco/module/repo-amp/context/bootstrap-context.xml',
-              'repo-amp/src/main/amp/config/alfresco/module/repo-amp/context/service-context.xml',
-              'repo-amp/src/main/amp/config/alfresco/module/repo-amp/context/webscript-context.xml',
-          	]
-          },
-          {
-            cmd: 'removeContextFileImports', 
-            contextFile: 'repo-amp/src/main/amp/config/alfresco/module/repo-amp/module-context.xml',
-            imports: [
-              'classpath:alfresco/module/${project.artifactId}/context/service-context.xml',
-              'classpath:alfresco/module/${project.artifactId}/context/bootstrap-context.xml',
-              'classpath:alfresco/module/${project.artifactId}/context/webscript-context.xml',
-            ]
-          },
-        ],
+        removeSamplesScript: function() {
+          this.out.error("WOO HOO GETTIN' WILD");
+          [ /* 'repo-amp/src/main/java/${projectPackagePath}/demoamp',
+            'repo-amp/src/test/java/${projectPackagePath}/demoamp', */
+            'repo-amp/src/main/amp/web/css/demoamp.css',
+            'repo-amp/src/main/amp/web/jsp/demoamp.jsp',
+            'repo-amp/src/main/amp/web/scripts/demoamp.js',
+            'repo-amp/src/main/amp/config/alfresco/extension/templates/webscripts/helloworld.get.desc.xml',
+            'repo-amp/src/main/amp/config/alfresco/extension/templates/webscripts/helloworld.get.html.ftl',
+            'repo-amp/src/main/amp/config/alfresco/extension/templates/webscripts/helloworld.get.js',
+            'repo-amp/src/main/amp/config/alfresco/module/repo-amp/webscripts/helloworld.get.js',
+            'repo-amp/src/main/amp/config/alfresco/module/repo-amp/context/bootstrap-context.xml',
+            'repo-amp/src/main/amp/config/alfresco/module/repo-amp/context/service-context.xml',
+            'repo-amp/src/main/amp/config/alfresco/module/repo-amp/context/webscript-context.xml',
+          ].forEach(function(file) {
+            this.out.warn("REMOVING FILE/FOLDER: " + file);
+            this.fs.delete(file);
+          }.bind(this));
+          var moduleContextPath = 'repo-amp/src/main/amp/config/alfresco/module/repo-amp/module-context.xml';
+          var contextDocOrig = this.fs.read(this.destinationPath(moduleContextPath));
+      	 var context = require('./spring-context.js')(contextDocOrig);
+          [ 'classpath:alfresco/module/${project.artifactId}/context/service-context.xml',
+            'classpath:alfresco/module/${project.artifactId}/context/bootstrap-context.xml',
+            'classpath:alfresco/module/${project.artifactId}/context/webscript-context.xml',
+          ].forEach(function(resource) {
+            this.out.warn("REMOVING IMPORT: " + resource);
+            context.removeImport(resource);
+          }.bind(this));
+          var contextDocNew = context.getContextString();
+          this.fs.write(moduleContextPath, contextDocNew);
+        },
       },
       "2.0.0": {
         archetypeGroupId: 'org.alfresco.maven.archetype',
@@ -86,6 +84,7 @@ module.exports = yeoman.generators.Base.extend({
       projectPackage: 'org.alfresco',
       communityOrEnterprise: 'Community',
       includeGitIgnore: true,
+      removeSamples: true,
     });
     try {
       this.javaVersion = versions.getJavaVersion();
@@ -179,6 +178,17 @@ module.exports = yeoman.generators.Base.extend({
         message: 'Should we generate a default .gitignore file?',
         default: this.config.get('includeGitIgnore'),
       },
+      {
+        type: 'confirm',
+        name: 'removeSamples',
+        message: 'Should we remove samples from default amps?',
+        default: this.config.get('removeSamples'),
+        when: function(props) {
+          this.sdk = this.sdkVersions[props.sdkVersion];
+          props['removeSamples'] = (true && this.sdk.removeSamplesScript);
+          return props['removeSamples'];
+        }.bind(this),
+      },
     ];
 
     var donePrompting = this.async();
@@ -193,6 +203,7 @@ module.exports = yeoman.generators.Base.extend({
         'projectPackage',
         'communityOrEnterprise',
         'includeGitIgnore',
+        'removeSamples',
       ], props);
       donePrompting();
     }.bind(this));
@@ -239,6 +250,10 @@ module.exports = yeoman.generators.Base.extend({
   },
 
   writing: {
+    test: function() {
+      this.fs.write("foo", "foo");
+      this.fs.delete("foo");
+    },
     generateArchetype: function () {
       var done = this.async();
 
@@ -344,6 +359,11 @@ module.exports = yeoman.generators.Base.extend({
           this.templatePath('repo'),
           this.destinationPath('repo'),
           tplContext);
+      }
+    },
+    removeSamplesScript: function () {
+      if (this.removeSamples) {
+        this.sdk.removeSamplesScript.call(this);
       }
     }
   },
